@@ -75,14 +75,24 @@ export default function Home() {
           to_date: toDate,
         }),
       });
+
       const data = await res.json();
+      
+      if (!res.ok) {
+        setError(data.error || data.details || `Server error: ${res.status}`);
+        return;
+      }
       
       if (Array.isArray(data)) {
         setUsers(data);
       } else if (data.error) {
+        setError(data.error);
         console.error("API Error:", data.error);
+      } else {
+        setError('Unexpected response format from server');
       }
-    } catch (error) {
+    } catch (error: any) {
+      setError(error.message || "Failed to fetch users. Please try again. Too many attempts may lead to temporary blocking by Desklog API.");
       console.error("Failed to fetch users:", error);
     } finally {
       setLoading(false);
@@ -92,6 +102,23 @@ export default function Home() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Helper function to convert "--" to "0" or return the value
+  const formatValue = (value: any, isPercentage = false): string | number => {
+    if (value === '--' || value === null || value === undefined) {
+      return isPercentage ? 0 : 'N/A';
+    }
+    return value;
+  };
+
+  // Helper function to get numeric efficiency value
+  const getNumericEfficiency = (value: any): number => {
+    if (value === '--' || value === null || value === undefined || value === '') {
+      return 0;
+    }
+    const num = typeof value === 'number' ? value : parseFloat(value);
+    return isNaN(num) ? 0 : num;
+  };
 
   // Get unique teams for filter dropdown
   const teams = useMemo(() => {
@@ -121,23 +148,6 @@ export default function Home() {
       return matchesSearch && matchesTeam && matchesEfficiency;
     });
   }, [users, searchTerm, filterTeam, filterEfficiency]);
-
-  // Helper function to convert "--" to "0" or return the value
-  const formatValue = (value: any, isPercentage = false): string | number => {
-    if (value === '--' || value === null || value === undefined) {
-      return isPercentage ? 0 : 'N/A';
-    }
-    return value;
-  };
-
-  // Helper function to get numeric efficiency value
-  const getNumericEfficiency = (value: any): number => {
-    if (value === '--' || value === null || value === undefined || value === '') {
-      return 0;
-    }
-    const num = typeof value === 'number' ? value : parseFloat(value);
-    return isNaN(num) ? 0 : num;
-  };
 
   // Export to Excel
   const exportToExcel = () => {
