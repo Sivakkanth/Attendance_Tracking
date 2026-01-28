@@ -1,10 +1,12 @@
 import axios, { AxiosError } from 'axios';
 import { NextRequest, NextResponse } from 'next/server';
 
-const DESKLOG_BASE_URL = "https://app.desklog.io/api/v2/";
-const DESKLOG_API_KEY = "Bearer 2YkVIrq6lpHU07nhxZRGabNArXObrkej137dawdm";
-// 2YkVIrq6lpHU07nhxZRGabNArXObrkej137dawdm
-// 1tevj6sw7pp4j3f0gec0addbw0hkbytahxaolnn3
+const DESKLOG_BASE_URL = process.env.DESKLOG_BASE_URL || "https://app.desklog.io/api/v2/";
+const DESKLOG_API_KEY = process.env.DESKLOG_API_KEY || "Bearer 2YkVIrq6lpHU07nhxZRGabNArXObrkej137dawdm";
+
+/**
+ * Convert date from YYYY-MM-DD to DD-MM-YYYY format required by Desklog API
+ */
 function formatDateForDesklog(dateStr: string): string {
     const [year, month, day] = dateStr.split('-');
     return `${day}-${month}-${year}`;
@@ -54,6 +56,10 @@ async function fetchUserAttendance(userId: number, fromDate: string, toDate: str
 
 export async function POST(req: NextRequest) {
     try {
+        // Log for debugging in production
+        console.log("API Key present:", !!DESKLOG_API_KEY);
+        console.log("Base URL:", DESKLOG_BASE_URL);
+
         const { from_date, to_date } = await req.json();
 
         // Validate required parameters
@@ -68,8 +74,11 @@ export async function POST(req: NextRequest) {
         const formattedFromDate = formatDateForDesklog(from_date);
         const formattedToDate = formatDateForDesklog(to_date);
 
+        console.log("Formatted dates:", { from: formattedFromDate, to: formattedToDate });
+
         // Fetch users
         const users = await fetchUsers();
+        console.log(`Fetched ${users.length} users`);
 
         // Fetch attendance for each user in parallel
         const userPerformancePromises = users.map(async (user: any) => {
@@ -85,11 +94,21 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(userPerformanceData);
     } catch (error) {
         const axiosError = error as AxiosError;
-        console.error("Desklog API error:", axiosError.response?.data || axiosError.message);
+        console.error("Desklog API error details:", {
+            status: axiosError.response?.status,
+            statusText: axiosError.response?.statusText,
+            data: axiosError.response?.data,
+            message: axiosError.message,
+        });
+        
         return NextResponse.json(
             {
                 error: "Failed to fetch user performance data", 
-                details: axiosError.response?.data || axiosError.message 
+                details: axiosError.response?.data || axiosError.message,
+                env: {
+                    hasApiKey: !!DESKLOG_API_KEY,
+                    hasBaseUrl: !!DESKLOG_BASE_URL,
+                }
             },
             { status: 500 }
         );
