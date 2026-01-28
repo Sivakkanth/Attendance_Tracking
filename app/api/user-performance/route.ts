@@ -4,9 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 const DESKLOG_BASE_URL = process.env.DESKLOG_BASE_URL || "https://app.desklog.io/api/v2/";
 const DESKLOG_API_KEY = process.env.DESKLOG_API_KEY || "Bearer 1tevj6sw7pp4j3f0gec0addbw0hkbytahxaolnn3";
 
-/**
- * Convert date from YYYY-MM-DD to DD-MM-YYYY format required by Desklog API
- */
 function formatDateForDesklog(dateStr: string): string {
     const [year, month, day] = dateStr.split('-');
     return `${day}-${month}-${year}`;
@@ -56,9 +53,13 @@ async function fetchUserAttendance(userId: number, fromDate: string, toDate: str
 
 export async function POST(req: NextRequest) {
     try {
-        // Log for debugging in production
-        console.log("API Key present:", !!DESKLOG_API_KEY);
-        console.log("Base URL:", DESKLOG_BASE_URL);
+        // Log for debugging in production (mask sensitive parts)
+        const apiKeyPrefix = DESKLOG_API_KEY ? DESKLOG_API_KEY.substring(0, 15) + '...' : 'missing';
+        console.log("Environment check:", {
+            apiKeyPrefix,
+            baseUrl: DESKLOG_BASE_URL,
+            nodeEnv: process.env.NODE_ENV,
+        });
 
         const { from_date, to_date } = await req.json();
 
@@ -108,6 +109,8 @@ export async function POST(req: NextRequest) {
                 env: {
                     hasApiKey: !!DESKLOG_API_KEY,
                     hasBaseUrl: !!DESKLOG_BASE_URL,
+                    apiKeyPrefix: DESKLOG_API_KEY ? DESKLOG_API_KEY.substring(0, 15) + '...' : 'missing',
+                    nodeEnv: process.env.NODE_ENV,
                 }
             },
             { status: 500 }

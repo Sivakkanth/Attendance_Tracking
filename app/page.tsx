@@ -10,50 +10,53 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTeam, setFilterTeam] = useState('');
   const [filterEfficiency, setFilterEfficiency] = useState('');
-  const [fromDate, setFromDate] = useState('2025-01-01');
-  const [toDate, setToDate] = useState('2025-01-31');
+  const [sortOrder, setSortOrder] = useState<'default' | 'high' | 'low'>('default');
+  const [fromDate, setFromDate] = useState(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const from = new Date(yesterday);
+    from.setDate(from.getDate() - 30);
+    return from.toISOString().split('T')[0];
+  });
+  const [toDate, setToDate] = useState(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday.toISOString().split('T')[0];
+  });
   const [error, setError] = useState<string>('');
 
-  // Validate date range
   const validateDateRange = (): boolean => {
     setError('');
-    
     if (!fromDate || !toDate) {
       setError('Both From Date and To Date are required');
       return false;
     }
-
     const from = new Date(fromDate);
+    from.setHours(0, 0, 0, 0);
     const to = new Date(toDate);
+    to.setHours(0, 0, 0, 0);
     
     if (from > to) {
       setError('From Date must be before or equal to To Date');
       return false;
     }
 
-    // Calculate difference in days
     const diffTime = Math.abs(to.getTime() - from.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
     if (diffDays > 31) {
       setError('Date range cannot exceed 31 days');
       return false;
     }
-
-    // Check if dates are in the future
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
     if (from > today) {
       setError('From Date cannot be in the future');
       return false;
     }
-    
     if (to > today) {
       setError('To Date cannot be in the future');
       return false;
     }
-
     return true;
   };
 
@@ -61,7 +64,6 @@ export default function Home() {
     if (!validateDateRange()) {
       return;
     }
-
     setLoading(true);
     setError('');
     try {
@@ -75,14 +77,11 @@ export default function Home() {
           to_date: toDate,
         }),
       });
-
       const data = await res.json();
-      
       if (!res.ok) {
         setError(data.error || data.details || `Server error: ${res.status}`);
         return;
       }
-      
       if (Array.isArray(data)) {
         setUsers(data);
       } else if (data.error) {
@@ -132,9 +131,7 @@ export default function Home() {
       const matchesSearch = searchTerm === '' || 
         u.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.user.email.toLowerCase().includes(searchTerm.toLowerCase());
-
       const matchesTeam = filterTeam === '' || u.user.team_name === filterTeam;
-
       let matchesEfficiency = true;
       if (filterEfficiency) {
         const efficiency = getNumericEfficiency(u.attendance?.efficiency_percentage);
@@ -144,7 +141,6 @@ export default function Home() {
           case 'low': matchesEfficiency = efficiency < 50; break;
         }
       }
-
       return matchesSearch && matchesTeam && matchesEfficiency;
     });
   }, [users, searchTerm, filterTeam, filterEfficiency]);
@@ -168,12 +164,12 @@ export default function Home() {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'User Performance');
-    
+
     // Auto-size columns
     const maxWidth = 20;
     const wscols = Object.keys(exportData[0] || {}).map(() => ({ wch: maxWidth }));
     ws['!cols'] = wscols;
-    
+
     XLSX.writeFile(wb, `user_performance_${fromDate}_to_${toDate}.xlsx`);
   };
 
@@ -187,8 +183,6 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-gray-800">User Performance Dashboard</h1>
-        
-        {/* Error Message */}
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center justify-between">
             <span>{error}</span>
@@ -204,7 +198,6 @@ export default function Home() {
             </button>
           </div>
         )}
-
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px]">
@@ -307,8 +300,22 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Users List */}
           <div className="bg-white rounded-lg shadow-md">
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-800">Users List</h2>
+              <button
+                onClick={() => {
+                  if (sortOrder === 'default') setSortOrder('high');
+                  else if (sortOrder === 'high') setSortOrder('low');
+                  else setSortOrder('default');
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors text-sm font-medium text-gray-700"
+                title={`Current: ${sortOrder === 'default' ? 'Default (A-Z)' : sortOrder === 'high' ? 'High Efficiency First' : 'Low Efficiency First'}`}
+              >
+                Sort: {sortOrder === 'default' ? 'A-Z' : sortOrder === 'high' ? 'High' : 'Low'}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+              </button>
             </div>
             <div className="overflow-auto max-h-[600px]">
               {loading ? (
@@ -316,7 +323,19 @@ export default function Home() {
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                   Loading users...
                 </div>
-              ) : filteredUsers.sort((a, b) => (a.user.name.localeCompare(b.user.name))).length > 0 ? (
+              ) : filteredUsers.sort((a, b) => {
+                if (sortOrder === 'default') {
+                  return a.user.name.localeCompare(b.user.name);
+                } else if (sortOrder === 'high') {
+                  const effA = getNumericEfficiency(a.attendance?.efficiency_percentage);
+                  const effB = getNumericEfficiency(b.attendance?.efficiency_percentage);
+                  return effB - effA; // High to low
+                } else {
+                  const effA = getNumericEfficiency(a.attendance?.efficiency_percentage);
+                  const effB = getNumericEfficiency(b.attendance?.efficiency_percentage);
+                  return effA - effB; // Low to high
+                }
+              }).length > 0 ? (
                 <ul className="divide-y divide-gray-200">
                   {filteredUsers.map(u => (
                     <li
