@@ -10,8 +10,8 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTeam, setFilterTeam] = useState('');
   const [filterEfficiency, setFilterEfficiency] = useState('');
-  const [fromDate, setFromDate] = useState('2024-01-01');
-  const [toDate, setToDate] = useState('2024-01-31');
+  const [fromDate, setFromDate] = useState('2025-01-01');
+  const [toDate, setToDate] = useState('2025-01-31');
   const [error, setError] = useState<string>('');
 
   // Validate date range
