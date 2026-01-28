@@ -13,9 +13,9 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'default' | 'high' | 'low'>('default');
   const [fromDate, setFromDate] = useState(() => {
     const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setDate(yesterday.getDate());
     const from = new Date(yesterday);
-    from.setDate(from.getDate() - 30);
+    from.setDate(from.getDate() - 31);
     return from.toISOString().split('T')[0];
   });
   const [toDate, setToDate] = useState(() => {
@@ -151,9 +151,13 @@ export default function Home() {
       'Name': u.user.name,
       'Email': u.user.email,
       'Team': u.user.team_name || 'N/A',
-      'Clock In': formatValue(u.attendance?.clock_in),
-      'Clock Out': formatValue(u.attendance?.clock_out),
-      'Time at Work': formatValue(u.attendance?.time_at_work),
+      'Login / In Time': formatValue(u.attendance?.clock_in),
+      'Exit / Out Time': formatValue(u.attendance?.clock_out),
+      'Total Working Hours': formatValue(u.attendance?.time_at_work),
+      'Lunch Break In': 'Not Available',
+      'Lunch Break Out': 'Not Available',
+      'Lunch Break Duration': 'Not Available',
+      'Net Working Time': formatValue(u.attendance?.productive_time),
       'Productive Time': formatValue(u.attendance?.productive_time),
       'Focus Time': formatValue(u.attendance?.focus_time),
       'Idle Time': formatValue(u.attendance?.idle_time),
@@ -169,6 +173,13 @@ export default function Home() {
     const maxWidth = 20;
     const wscols = Object.keys(exportData[0] || {}).map(() => ({ wch: maxWidth }));
     ws['!cols'] = wscols;
+
+    // Add note about missing data
+    const noteRow = exportData.length + 3;
+    ws[`A${noteRow}`] = { 
+      t: 's', 
+      v: 'Note: Lunch break data is not available from Desklog API. Net Working Time shows Productive Time instead.' 
+    };
 
     XLSX.writeFile(wb, `user_performance_${fromDate}_to_${toDate}.xlsx`);
   };
@@ -393,37 +404,33 @@ export default function Home() {
 
                   {selectedUser.attendance ? (
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-gray-50 p-3 rounded-lg">
-                        <p className="text-xs text-gray-500 mb-1">Clock In</p>
+                      <div className="bg-blue-50 p-3 rounded-lg">
+                        <p className="text-xs text-blue-600 mb-1">Login / In Time</p>
                         <p className="font-semibold text-gray-900">{selectedUser.attendance.clock_in === '--' ? 'N/A' : selectedUser.attendance.clock_in}</p>
                       </div>
-                      <div className="bg-gray-50 p-3 rounded-lg">
-                        <p className="text-xs text-gray-500 mb-1">Clock Out</p>
+                      <div className="bg-red-50 p-3 rounded-lg">
+                        <p className="text-xs text-red-600 mb-1">Exit / Out Time</p>
                         <p className="font-semibold text-gray-900">{selectedUser.attendance.clock_out === '--' ? 'N/A' : selectedUser.attendance.clock_out}</p>
                       </div>
-                      <div className="bg-gray-50 p-3 rounded-lg">
-                        <p className="text-xs text-gray-500 mb-1">Time at Work</p>
+                      <div className="bg-purple-50 p-3 rounded-lg">
+                        <p className="text-xs text-purple-600 mb-1">Total Working Hours</p>
                         <p className="font-semibold text-gray-900">{selectedUser.attendance.time_at_work === '--' ? '0h 0m' : selectedUser.attendance.time_at_work}</p>
                       </div>
-                      <div className="bg-gray-50 p-3 rounded-lg">
-                        <p className="text-xs text-gray-500 mb-1">Productive Time</p>
+                      <div className="bg-green-50 p-3 rounded-lg">
+                        <p className="text-xs text-green-600 mb-1">Net Working Time</p>
                         <p className="font-semibold text-gray-900">{selectedUser.attendance.productive_time === '--' ? '0h 0m' : selectedUser.attendance.productive_time}</p>
                       </div>
-                      <div className="bg-gray-50 p-3 rounded-lg">
-                        <p className="text-xs text-gray-500 mb-1">Focus Time</p>
-                        <p className="font-semibold text-gray-900">{selectedUser.attendance.focus_time === '--' ? '0h 0m' : selectedUser.attendance.focus_time}</p>
+                      <div className="bg-orange-50 p-3 rounded-lg col-span-2">
+                        <p className="text-xs text-orange-600 mb-1">Lunch Break</p>
+                        <p className="font-semibold text-gray-500 italic">Data not available from API</p>
                       </div>
-                      <div className="bg-gray-50 p-3 rounded-lg">
-                        <p className="text-xs text-gray-500 mb-1">Idle Time</p>
-                        <p className="font-semibold text-gray-900">{selectedUser.attendance.idle_time === '--' ? '0h 0m' : selectedUser.attendance.idle_time}</p>
+                      <div className="bg-indigo-50 p-3 rounded-lg">
+                        <p className="text-xs text-indigo-600 mb-1">Activity %</p>
+                        <p className="font-bold text-indigo-700 text-lg">{getNumericEfficiency(selectedUser.attendance.activity_percentage)}%</p>
                       </div>
-                      <div className="bg-green-50 p-3 rounded-lg">
-                        <p className="text-xs text-green-600 mb-1">Activity Percentage</p>
-                        <p className="font-bold text-green-700 text-lg">{getNumericEfficiency(selectedUser.attendance.activity_percentage)}%</p>
-                      </div>
-                      <div className="bg-blue-50 p-3 rounded-lg">
-                        <p className="text-xs text-blue-600 mb-1">Efficiency Percentage</p>
-                        <p className="font-bold text-blue-700 text-lg">{getNumericEfficiency(selectedUser.attendance.efficiency_percentage)}%</p>
+                      <div className="bg-teal-50 p-3 rounded-lg">
+                        <p className="text-xs text-teal-600 mb-1">Efficiency %</p>
+                        <p className="font-bold text-teal-700 text-lg">{getNumericEfficiency(selectedUser.attendance.efficiency_percentage)}%</p>
                       </div>
                     </div>
                   ) : (
