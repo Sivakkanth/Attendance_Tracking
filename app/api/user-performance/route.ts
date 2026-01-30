@@ -2,8 +2,8 @@ import axios, { AxiosError } from 'axios';
 import { NextRequest, NextResponse } from 'next/server';
 import { exportToGoogleSheet } from '../../../utils/googleSheetExport';
 
-const DESKLOG_BASE_URL = process.env.DESKLOG_BASE_URL;
-const DESKLOG_API_KEY = process.env.DESKLOG_API_KEY;
+const DESKLOG_BASE_URL = process.env.DESKLOG_BASE_URL || "https://app.desklog.io/api/v2/";
+const DESKLOG_API_KEY = process.env.DESKLOG_API_KEY || "Bearer 1tevj6sw7pp4j3f0gec0addbw0hkbytahxaolnn3";
 
 function formatDateForDesklog(dateStr: string): string {
     const [year, month, day] = dateStr.split('-');
