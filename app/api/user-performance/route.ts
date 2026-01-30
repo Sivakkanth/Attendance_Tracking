@@ -1,8 +1,9 @@
 import axios, { AxiosError } from 'axios';
 import { NextRequest, NextResponse } from 'next/server';
+import { exportToGoogleSheet } from '../../../utils/googleSheetExport';
 
-const DESKLOG_BASE_URL = process.env.DESKLOG_BASE_URL || "https://app.desklog.io/api/v2/";
-const DESKLOG_API_KEY = process.env.DESKLOG_API_KEY || "Bearer 1tevj6sw7pp4j3f0gec0addbw0hkbytahxaolnn3";
+const DESKLOG_BASE_URL = process.env.DESKLOG_BASE_URL;
+const DESKLOG_API_KEY = process.env.DESKLOG_API_KEY;
 
 function formatDateForDesklog(dateStr: string): string {
     const [year, month, day] = dateStr.split('-');
@@ -52,18 +53,13 @@ async function fetchUserAttendance(userId: number, fromDate: string, toDate: str
 }
 
 export async function POST(req: NextRequest) {
+
+// Default POST: fetch user performance data
     try {
-        // Log for debugging in production (mask sensitive parts)
         const apiKeyPrefix = DESKLOG_API_KEY ? DESKLOG_API_KEY.substring(0, 15) + '...' : 'missing';
-        console.log("Environment check:", {
-            apiKeyPrefix,
-            baseUrl: DESKLOG_BASE_URL,
-            nodeEnv: process.env.NODE_ENV,
-        });
+        const { from_date, to_date, exportToGoogleSheet: exportToSheet } = await req.json();
+        const spreadsheetId = process.env.GOOGLE_SHEET_ID || undefined;
 
-        const { from_date, to_date } = await req.json();
-
-        // Validate required parameters
         if (!from_date || !to_date) {
             return NextResponse.json(
                 { error: "from_date and to_date are required" },
@@ -71,17 +67,10 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Convert dates to Desklog format (DD-MM-YYYY)
         const formattedFromDate = formatDateForDesklog(from_date);
         const formattedToDate = formatDateForDesklog(to_date);
 
-        console.log("Formatted dates:", { from: formattedFromDate, to: formattedToDate });
-
-        // Fetch users
         const users = await fetchUsers();
-        console.log(`Fetched ${users.length} users`);
-
-        // Fetch attendance for each user in parallel
         const userPerformancePromises = users.map(async (user: any) => {
             const attendance = await fetchUserAttendance(user.id, formattedFromDate, formattedToDate);
             return {
@@ -89,19 +78,63 @@ export async function POST(req: NextRequest) {
                 attendance,
             };
         });
-
         const userPerformanceData = await Promise.all(userPerformancePromises);
 
+        // If exportToGoogleSheet is true, export and return the sheet URL
+        if (exportToSheet) {
+            // Prepare headers and rows
+            const headers = [
+                'Name',
+                'Email',
+                'Team',
+                'Login / In Time',
+                'Exit / Out Time',
+                'Total Working Hours',
+                'Lunch Break In',
+                'Lunch Break Out',
+                'Lunch Break Duration',
+                'Net Working Time',
+                'Productive Time',
+                'Focus Time',
+                'Idle Time',
+                'Activity %',
+                'Efficiency %',
+            ];
+            const rows = userPerformanceData.map(({ user, attendance }) => [
+                user?.name || '',
+                user?.email || '',
+                user?.team_name || 'N/A',
+                attendance?.clock_in || '',
+                attendance?.clock_out || '',
+                attendance?.time_at_work || '',
+                'Not Available', // Lunch Break In
+                'Not Available', // Lunch Break Out
+                'Not Available', // Lunch Break Duration
+                attendance?.productive_time || '', // Net Working Time (same as Productive Time)
+                attendance?.productive_time || '',
+                attendance?.focus_time || '',
+                attendance?.idle_time || '',
+                attendance?.activity_percentage ?? '',
+                attendance?.efficiency_percentage ?? '',
+            ]);
+            let sheetTitle = '';
+            if (from_date === to_date) {
+                sheetTitle = `User Performance ${from_date}`;
+            } else {
+                sheetTitle = `User Performance ${from_date} to ${to_date}`;
+            }
+            try {
+                const { url } = await exportToGoogleSheet({ sheetTitle, headers, rows, spreadsheetId });
+                return NextResponse.json({ success: true, url });
+            } catch (sheetError) {
+                return NextResponse.json({ error: 'Failed to export to Google Sheets', details: (sheetError as Error).message }, { status: 500 });
+            }
+        }
+
+        // Default: return data as JSON
         return NextResponse.json(userPerformanceData);
     } catch (error) {
         const axiosError = error as AxiosError;
-        console.error("Desklog API error details:", {
-            status: axiosError.response?.status,
-            statusText: axiosError.response?.statusText,
-            data: axiosError.response?.data,
-            message: axiosError.message,
-        });
-        
         return NextResponse.json(
             {
                 error: "Failed to fetch user performance data", 
