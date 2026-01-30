@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     try {
         const apiKeyPrefix = DESKLOG_API_KEY ? DESKLOG_API_KEY.substring(0, 15) + '...' : 'missing';
         const { from_date, to_date, exportToGoogleSheet: exportToSheet } = await req.json();
-        const spreadsheetId = process.env.GOOGLE_SHEET_ID || undefined;
+        const spreadsheetId = process.env.GOOGLE_SHEET_ID || "1d0tisFmBnLOMLO0CgqH0LL1gYOhuh-gcF4ua5lKtu7U";
 
         if (!from_date || !to_date) {
             return NextResponse.json(
